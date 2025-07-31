@@ -7,14 +7,24 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
+// Lưu pattern gần nhất (tối đa 20)
+let patternHistory = "";
+
+function updatePattern(result) {
+  if (patternHistory.length >= 20) {
+    patternHistory = patternHistory.slice(1);
+  }
+  patternHistory += result;
+}
+
 function getTaiXiu(sum) {
   return sum >= 11 ? 'Tài' : 'Xỉu';
 }
 
-function predictTaiXiu(history = []) {
-  // Có thể thay bằng thuật toán Markov, Azenly... ở đây ta mặc định dự đoán giống kết quả hiện tại
-  if (!history.length) return 'Xỉu';
-  return history[0].result;
+function predictPattern(history) {
+  if (history.length < 6) return "Chưa đủ dữ liệu";
+  const lastChar = history[history.length - 1];
+  return lastChar === 't' ? "Xỉu" : "Tài";
 }
 
 app.get('/api/taixiu/lottery', async (req, res) => {
@@ -28,18 +38,24 @@ app.get('/api/taixiu/lottery', async (req, res) => {
 
     const data = json.data;
     const dice = data.OpenCode.split(',').map(Number);
-    const sum = dice.reduce((a, b) => a + b, 0);
-    const result = getTaiXiu(sum);
+    const [d1, d2, d3] = dice;
+    const sum = d1 + d2 + d3;
+    const ket_qua = getTaiXiu(sum);
+    const patternChar = ket_qua === "Tài" ? "t" : "x";
 
-    const currentSession = parseInt(data.Expect.replace(/^25/, ''));
-    const prediction = predictTaiXiu([{ result }]);
+    updatePattern(patternChar);
+    const du_doan = predictPattern(patternHistory);
 
     return res.json({
-      current_result: result,
-      current_session: currentSession,
-      next_session: currentSession + 1,
-      prediction: prediction,
-      timestamp: new Date().toISOString()
+      id: "binhtool90",
+      Phien: parseInt(data.Expect.replace(/^25/, '')),
+      Xuc_xac_1: d1,
+      Xuc_xac_2: d2,
+      Xuc_xac_3: d3,
+      Tong: sum,
+      Ket_qua: ket_qua,
+      Pattern: patternHistory,
+      Du_doan: du_doan
     });
   } catch (error) {
     res.status(500).json({ error: 'Lỗi khi fetch dữ liệu', details: error.message });
@@ -47,5 +63,5 @@ app.get('/api/taixiu/lottery', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
 });
